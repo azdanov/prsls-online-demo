@@ -10,6 +10,11 @@ custom:
       - CognitoUserPoolServerClientId
     output:
       file: ./.env-outputs
+  logLevel:
+    prod: INFO
+    default: DEBUG
+  serverless-iam-roles-per-function:
+    defaultInherit: true
 provider:
   name: aws
   runtime: nodejs16.x
@@ -19,6 +24,19 @@ provider:
     rest_api_url: !Sub https://${ApiGatewayRestApi}.execute-api.${aws:region}.amazonaws.com/${sls:stage}
     serviceName: ${self:service}
     stage: ${sls:stage}
+    LOG_LEVEL: ${self:custom.logLevel.${sls:stage}, self:custom.logLevel.default}
+    AWS_NODEJS_CONNECTION_REUSE_ENABLED: "1"
+  tracing:
+    apiGateway: true
+    lambda: true
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - "xray:PutTraceSegments"
+            - "xray:PutTelemetryRecords"
+          Resource: "*"
 plugins:
   - serverless-export-env
   - serverless-export-outputs
@@ -77,8 +95,8 @@ functions:
         Resource:
           - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${self:service}/${sls:stage}/search-restaurants/config
       # - Effect: Allow
-        # Action: kms:Decrypt
-        # Resource: ${ssm:/${sls:stage}/kmsArn}
+      # Action: kms:Decrypt
+      # Resource: ${ssm:/${sls:stage}/kmsArn}
   place-order:
     handler: functions/place-order.handler
     events:

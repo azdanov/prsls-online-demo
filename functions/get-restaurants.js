@@ -1,25 +1,32 @@
-const middy = require("@middy/core");
 const ssm = require("@middy/ssm");
 const DocumentClient = require("aws-sdk/clients/dynamodb").DocumentClient;
 const dynamodb = new DocumentClient();
+const XRay = require("aws-xray-sdk-core");
+const Log = require("@dazn/lambda-powertools-logger");
+const wrap = require("@dazn/lambda-powertools-pattern-basic");
 
-const { serviceName, stage } = process.env;
+XRay.captureAWSClient(dynamodb.service);
 
-const tableName = process.env.restaurants_table;
+const { serviceName, stage, restaurants_table } = process.env;
 
 const getRestaurants = async (count) => {
-  console.log(`fetching ${count} restaurants from ${tableName}...`);
+  Log.debug("getting restaurants from DynamoDB...", {
+    count,
+    tableName: restaurants_table,
+  });
   const req = {
-    TableName: tableName,
+    TableName: restaurants_table,
     Limit: count,
   };
 
   const resp = await dynamodb.scan(req).promise();
-  console.log(`found ${resp.Items.length} restaurants`);
+  Log.debug("found restaurants", {
+    count: resp.Items.length,
+  });
   return resp.Items;
 };
 
-module.exports.handler = middy(async (event, context) => {
+module.exports.handler = wrap(async (event, context) => {
   const restaurants = await getRestaurants(context.config.defaultResults);
   return {
     statusCode: 200,

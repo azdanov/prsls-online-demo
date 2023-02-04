@@ -11,7 +11,7 @@ const mode = process.env.TEST_MODE;
 const viaHandler = async (event, functionName) => {
   const handler = require(`${APP_ROOT}/functions/${functionName}`).handler;
 
-  const context = {};
+  const context = { awsRequestId: "test" };
   const response = await handler(event, context);
   const contentType = _.get(
     response,

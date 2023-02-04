@@ -3,6 +3,12 @@ const Mustache = require("mustache");
 const http = require("axios");
 const aws4 = require("aws4");
 const URL = require("node:url");
+const Log = require("@dazn/lambda-powertools-logger");
+const wrap = require("@dazn/lambda-powertools-pattern-basic");
+const AWSXRay = require("aws-xray-sdk-core");
+const CorrelationIds = require("@dazn/lambda-powertools-correlation-ids");
+
+AWSXRay.captureHTTPsGlobal(require("node:https"));
 
 const restaurantsApiRoot = process.env.restaurants_api;
 const ordersApiRoot = process.env.orders_api;
@@ -24,7 +30,7 @@ const days = [
 const template = fs.readFileSync("static/index.html", "utf8");
 
 const getRestaurants = async () => {
-  console.log(`loading restaurants from ${restaurantsApiRoot}...`);
+  Log.debug("getting restaurants...", { url: restaurantsApiRoot });
   const url = URL.parse(restaurantsApiRoot);
   const opts = {
     host: url.hostname,
@@ -34,16 +40,16 @@ const getRestaurants = async () => {
   aws4.sign(opts);
 
   const httpReq = http.get(restaurantsApiRoot, {
-    headers: opts.headers,
+    headers: Object.assign({}, opts.headers, CorrelationIds.get()),
   });
   const { data } = await httpReq;
 
   return data;
 };
 
-module.exports.handler = async () => {
+module.exports.handler = wrap(async () => {
   const restaurants = await getRestaurants();
-  console.log(`found ${restaurants.length} restaurants`);
+  Log.debug("got restaurants", { count: restaurants.length });
   const dayOfWeek = days[new Date().getDay()];
   const view = {
     awsRegion,
@@ -62,4 +68,4 @@ module.exports.handler = async () => {
     },
     body: html,
   };
-};
+});
